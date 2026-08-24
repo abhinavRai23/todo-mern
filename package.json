@@ -1,0 +1,16 @@
+{
+  "name": "todo-mern",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "npm install --prefix frontend & npm install --prefix backend & npm run build --prefix frontend",
+    "start": "npm run start --prefix backend",
+    "dev": "npm run dev --prefix frontend & npm run dev --prefix backend",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs"
+}
