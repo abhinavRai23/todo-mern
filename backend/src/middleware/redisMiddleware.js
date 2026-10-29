@@ -3,9 +3,10 @@ import redisRateLimiter from '../config/upstash.js';
 // Middleware to apply rate limiting using Redis
 const redisRateLimitingMiddleware = async (req, res, next) => {
     try {
-        // Use a constant string to limit all requests with a single ratelimit
-        // Or use a userID, apiKey or ip address for individual limits.
-        const identifier = "todo-app-rate-limit";
+        // Rate limit per IP, prefixed with app name for readable Redis keys
+        // Key format in Redis: @upstash/ratelimit:todo-app:<ip>
+        const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown';
+        const identifier = `todo-app:${ip}`;
         const { success } = await redisRateLimiter.limit(identifier);
 
         if (!success) {

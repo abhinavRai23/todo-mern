@@ -1,15 +1,14 @@
 import express from 'express';
-import dotenv from 'dotenv';
 import cors from 'cors';
 import path from 'path';
 import connectDB from './config/db.js';
 import notesRoutes from './routes/notesRoutes.js';
 import redisRateLimitingMiddleware from './middleware/redisMiddleware.js';
 
-dotenv.config();
-
 const app = express();
 const __dirname = path.resolve();
+
+app.set('trust proxy', 1); // Trust Render's reverse proxy so req.ip is the real client IP
 
 if (process.env.NODE_ENV === 'development') {
     app.use(cors({
