@@ -1,61 +1,62 @@
 # ToDo MERN
 
-A full-stack notes application built with React, TypeScript, Vite, Express, MongoDB Atlas, and Upstash Redis rate limiting.
+A modern full-stack notes application built with React 19, TypeScript, Vite, Express 5, MongoDB Atlas, and Upstash Redis rate limiting.
 
-## System Architecture
+---
+
+## Architecture Overview
 
 ```mermaid
-flowchart TD
-    subgraph Client ["Client Layer"]
-        Browser["User Browser / Client"]
+flowchart LR
+    %% Nodes
+    Client(["🌐 Client Browser"])
+
+    subgraph Render [" ☁️ Render Web Service (Express Monolith) "]
+        Router{"Traffic Router"}
+        Frontend["⚛️ React 19 SPA<br/><code>Vite · DaisyUI · Static Assets</code>"]
+        Limiter{"🛡️ Rate Limiter<br/><code>30 req / 60s per IP</code>"}
+        API["⚙️ Express API<br/><code>/api/notes</code>"]
     end
 
-    subgraph Render ["Render Web Service (Single Instance)"]
-        direction TB
-        Proxy["Render Reverse Proxy (trust proxy)"]
-        
-        subgraph ExpressApp ["Express Backend Application (:PORT)"]
-            Router{"Request Target"}
-            RateLimit["Redis Rate Limiter\n(slidingWindow: 30 req / 60s per IP)"]
-            APIHandler["Notes API Routes\n(/api/notes)"]
-            StaticFiles["Static Asset Handler\n(frontend/dist & SPA fallback)"]
-        end
+    subgraph Cloud [" 🗄️ Managed Cloud Services "]
+        Upstash[("⚡ Upstash Redis<br/><code>Sliding Window Counter</code>")]
+        Mongo[("🍃 MongoDB Atlas<br/><code>Document Database</code>")]
     end
 
-    subgraph External ["External Cloud Services"]
-        Upstash[("Upstash Redis\n(REST API / Sliding Window TTL)")]
-        MongoDB[("MongoDB Atlas\n(Mongoose ODM)")]
-    end
+    %% Edge Connections
+    Client -->|"HTTP Requests"| Router
+    Router -->|"/* (Page Load)"| Frontend
+    Router -->|"/api/*"| Limiter
 
-    Browser -->|"HTTP / HTTPS Requests"| Proxy
-    Proxy -->|"Forwarded Request (with x-forwarded-for)"| Router
-    
-    Router -->|"Static Assets / Page Load"| StaticFiles
-    Router -->|"/api/notes/*"| RateLimit
-    
-    RateLimit -->|"Check & Increment Limit\n@upstash/ratelimit:todo-app:<ip>"| Upstash
-    
-    RateLimit -->|"Allowed (success: true)"| APIHandler
-    RateLimit -.->|"Blocked (429 Too Many Requests)"| Browser
-    
-    APIHandler <-->|"Queries & Mutations (CRUD)"| MongoDB
+    Limiter <-->|"Check Quota"| Upstash
+    Limiter -->|"Allowed"| API
+    Limiter -.->|"Rate Exceeded (429)"| Client
+
+    API <-->|"Mongoose Queries"| Mongo
 ```
 
 ---
 
 ## Project Structure
 
-- `frontend/` - React 19, TypeScript, Vite, Tailwind CSS v4, DaisyUI, TanStack Query
-- `backend/` - Express 5, Mongoose 9, Upstash Redis Rate Limiting (Node 24 native env loading)
-- `backend/Todo/` - API request collection files
-- `pnpm-workspace.yaml` - Monorepo workspace configuration
+```
+ToDo-MERN/
+├── frontend/             # React 19 + TypeScript + Vite + Tailwind CSS v4 + DaisyUI
+├── backend/              # Express 5 + Mongoose 9 + Upstash Redis Rate Limiting
+│   ├── src/              # Server source code (routes, middleware, config, models)
+│   └── Todo/             # API request collection / testing files
+├── pnpm-workspace.yaml   # Workspace configuration
+└── package.json          # Root orchestration scripts
+```
+
+---
 
 ## Requirements
 
 - **Node.js**: `>=24.0.0`
 - **pnpm**: `>=12.11.2`
 - **MongoDB**: MongoDB Atlas database (or local MongoDB)
-- **Upstash Redis**: Upstash Redis database (REST credentials)
+- **Upstash Redis**: Serverless Redis database
 
 ---
 
@@ -69,7 +70,7 @@ flowchart TD
 
 2. **Configure environment variables:**
 
-   Create `backend/.env`:
+   Create a `backend/.env` file:
 
    ```env
    MONGODB_URI=your_mongodb_connection_string
@@ -79,29 +80,28 @@ flowchart TD
    PORT=5001
    ```
 
-   > Node 24 natively loads this file via `--env-file-if-exists=.env`.
+   > Node 24 natively loads this file via `--env-file-if-exists=.env` without external packages.
 
-3. **Start local servers:**
+3. **Start development servers:**
 
    ```bash
    pnpm run dev
    ```
 
-   - **Frontend**: `http://localhost:5173`
-   - **Backend API**: `http://localhost:5001`
+   - **Frontend**: [http://localhost:5173](http://localhost:5173)
+   - **Backend API**: [http://localhost:5001](http://localhost:5001)
 
 ---
 
 ## Render Deployment
 
-This project deploys as a single Render Web Service. Express hosts the API and serves the production-built Vite frontend assets.
+This project is configured to deploy as a single unified **Render Web Service**. Express hosts the API and serves the production-built Vite SPA.
 
-### 1. Create the Service in Render
+### 1. Create Web Service in Render
 
 1. Push your repository to GitHub / GitLab.
-2. In the Render Dashboard, click **New +** → **Web Service**.
-3. Select your repository.
-4. Configure service settings:
+2. In Render, select **New +** → **Web Service** and choose your repository.
+3. Configure the build and start commands:
 
    | Setting | Value |
    | --- | --- |
@@ -109,46 +109,48 @@ This project deploys as a single Render Web Service. Express hosts the API and s
    | **Build Command** | `pnpm run build` |
    | **Start Command** | `pnpm run start` |
 
-5. Add Environment Variables under **Environment**:
+4. Under **Environment Variables**, add:
 
    | Variable | Value | Notes |
    | --- | --- | --- |
-   | `NODE_VERSION` | `24` | Ensures Node 24 runtime |
-   | `NODE_ENV` | `production` | Enables production static file serving |
-   | `MONGODB_URI` | `mongodb+srv://...` | Connection string |
-   | `UPSTASH_REDIS_REST_URL` | `https://...` | From Upstash Console |
-   | `UPSTASH_REDIS_REST_TOKEN` | `...` | From Upstash Console |
+   | `NODE_VERSION` | `24` | Required for Node 24 features |
+   | `NODE_ENV` | `production` | Enables production asset serving |
+   | `MONGODB_URI` | `mongodb+srv://...` | MongoDB connection string |
+   | `UPSTASH_REDIS_REST_URL` | `https://...` | Upstash REST URL |
+   | `UPSTASH_REDIS_REST_TOKEN` | `...` | Upstash REST Token |
 
-### 2. Configure MongoDB Atlas IP Access
+### 2. Whitelist Render IP in MongoDB Atlas
 
-Render uses dynamic outbound IP addresses:
+Render instances use dynamic outbound IPs on standard/free plans:
 
-1. Open **MongoDB Atlas** → **Network Access**.
+1. In [MongoDB Atlas](https://cloud.mongodb.com/), go to **Security** → **Network Access**.
 2. Click **Add IP Address**.
-3. Choose **Allow Access from Anywhere** (`0.0.0.0/0`) and confirm.
+3. Select **Allow Access from Anywhere** (`0.0.0.0/0`) and click **Confirm**.
 
 ---
 
 ## API Endpoints
 
-All endpoints are protected by the Upstash Redis rate limiter (`30 requests / 60 seconds` per client IP):
+All API routes are protected by per-client-IP rate limiting (`30 requests / 60 seconds` via Upstash Redis):
 
-- `GET    /api/notes` - List all notes
-- `POST   /api/notes` - Create a note
-- `GET    /api/notes/:id` - Fetch a single note
-- `PUT    /api/notes/:id` - Replace a note
-- `PATCH  /api/notes/:id` - Update a note
-- `DELETE /api/notes/:id` - Delete a note
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/api/notes` | List all notes |
+| `POST` | `/api/notes` | Create a new note |
+| `GET` | `/api/notes/:id` | Fetch note details by ID |
+| `PUT` | `/api/notes/:id` | Replace note content |
+| `PATCH` | `/api/notes/:id` | Partially update a note |
+| `DELETE` | `/api/notes/:id` | Delete a note |
 
 ---
 
 ## Available Scripts
 
-Run from the repository root:
+Run from the root directory:
 
-- `pnpm run dev` - Run frontend and backend concurrently in development mode
-- `pnpm run build` - Install dependencies across workspaces and compile frontend bundle
-- `pnpm run start` - Start backend Express production server (serves API & SPA frontend)
+- `pnpm run dev` - Start both frontend and backend concurrently in development mode
+- `pnpm run build` - Install dependencies across workspaces and compile frontend bundle to `frontend/dist`
+- `pnpm run start` - Start backend production server (serves both API & SPA frontend)
 
 ---
 
